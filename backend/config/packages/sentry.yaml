@@ -1,0 +1,26 @@
+when@prod:
+    sentry:
+        dsn: '%env(SENTRY_DSN)%'
+        register_error_listener: false
+        register_error_handler: false
+        options:
+            environment: '%kernel.environment%'
+            # Never ship IPs, cookies, headers or request bodies (personal data, session tokens) to Sentry.
+            send_default_pii: false
+            traces_sample_rate: 0.1
+            ignore_exceptions:
+                - Symfony\Component\HttpKernel\Exception\NotFoundHttpException
+                - Symfony\Component\Security\Core\Exception\AccessDeniedException
+
+    services:
+        Sentry\Monolog\Handler:
+            arguments:
+                $hub: '@Sentry\State\HubInterface'
+                $level: !php/enum Monolog\Level::Error
+                $fillExtraContext: true
+
+    monolog:
+        handlers:
+            sentry:
+                type: service
+                id: Sentry\Monolog\Handler

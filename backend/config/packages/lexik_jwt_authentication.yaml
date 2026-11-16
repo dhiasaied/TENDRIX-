@@ -1,0 +1,27 @@
+lexik_jwt_authentication:
+    secret_key: '%env(resolve:JWT_SECRET_KEY)%'
+    public_key: '%env(resolve:JWT_PUBLIC_KEY)%'
+    pass_phrase: '%env(JWT_PASSPHRASE)%'
+    token_ttl: '%env(int:JWT_TTL)%'
+    user_id_claim: email
+    # Clock skew tolerance between API replicas.
+    clock_skew: 30
+
+    # The browser session lives in an httpOnly, SameSite=Strict cookie scoped to /api: JavaScript
+    # (and therefore XSS) can never read it, and cross-site requests never carry it.
+    # The Authorization header remains accepted for server-to-server API clients.
+    token_extractors:
+        authorization_header:
+            enabled: true
+        cookie:
+            enabled: true
+            name: BEARER
+    set_cookies:
+        BEARER:
+            lifetime: null # = token_ttl
+            samesite: strict
+            path: /api
+            domain: null
+            secure: '%env(bool:JWT_COOKIE_SECURE)%'
+            httpOnly: true
+    remove_token_from_body_when_cookies_used: true

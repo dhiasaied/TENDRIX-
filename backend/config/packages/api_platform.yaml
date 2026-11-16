@@ -1,0 +1,40 @@
+api_platform:
+    title: TENDRIX API
+    description: |
+        Vendor Management System for intellectual services procurement: tenders, AI matching,
+        contracting, invoicing and supplier performance. Authenticate with `POST /api/auth/login`:
+        browsers receive an httpOnly session cookie; API clients may send `Authorization: Bearer <token>`.
+    version: 1.0.0
+    mapping:
+        paths:
+            - '%kernel.project_dir%/src/Entity'
+            - '%kernel.project_dir%/src/ApiResource'
+    formats:
+        jsonld: ['application/ld+json']
+        json: ['application/json']
+    docs_formats:
+        jsonld: ['application/ld+json']
+        jsonopenapi: ['application/vnd.openapi+json']
+        html: ['text/html']
+    patch_formats:
+        json: ['application/merge-patch+json']
+    swagger:
+        api_keys:
+            JWT:
+                name: Authorization
+                type: header
+    defaults:
+        stateless: true
+        pagination_items_per_page: 20
+        pagination_client_items_per_page: true
+        pagination_maximum_items_per_page: 100
+        cache_headers:
+            vary: ['Content-Type', 'Authorization', 'Origin', 'Cookie']
+
+# The API surface is not advertised in production (docs, Swagger UI and the Hydra entrypoint are off).
+when@prod:
+    api_platform:
+        enable_docs: false
+        enable_swagger_ui: false
+        enable_re_doc: false
+        enable_entrypoint: false

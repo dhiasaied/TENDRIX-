@@ -1,0 +1,6 @@
+.env.docker
+.cache/
+phpunit-report.xml
+.idea/
+.vscode/
+.DS_Store

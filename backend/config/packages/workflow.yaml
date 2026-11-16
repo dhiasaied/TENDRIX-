@@ -1,0 +1,116 @@
+# Business lifecycles. Guards express *who* may fire a transition; business invariants
+# (deadlines, remaining days...) are enforced in App\Workflow\WorkflowGuardSubscriber.
+framework:
+    workflows:
+        tender:
+            type: state_machine
+            audit_trail: { enabled: true }
+            marking_store: { type: method, property: status }
+            supports: [App\Entity\Tender]
+            initial_marking: draft
+            places: [draft, pending_approval, published, closed, awarded, cancelled]
+            transitions:
+                submit:
+                    guard: "is_granted('TENDER_EDIT', subject)"
+                    from: draft
+                    to: pending_approval
+                publish:
+                    guard: "is_granted('ROLE_BUYER') and is_granted('ORG_MEMBER', subject.getOrganization())"
+                    from: [draft, pending_approval]
+                    to: published
+                reject:
+                    guard: "is_granted('ROLE_BUYER') and is_granted('ORG_MEMBER', subject.getOrganization())"
+                    from: pending_approval
+                    to: draft
+                close:
+                    guard: "is_granted('ROLE_BUYER') and is_granted('ORG_MEMBER', subject.getOrganization())"
+                    from: published
+                    to: closed
+                reopen:
+                    guard: "is_granted('ROLE_BUYER') and is_granted('ORG_MEMBER', subject.getOrganization())"
+                    from: closed
+                    to: published
+                award:
+                    # Fired internally when a proposal is accepted.
+                    guard: "is_granted('ROLE_BUYER') and is_granted('ORG_MEMBER', subject.getOrganization())"
+                    from: [published, closed]
+                    to: awarded
+                cancel:
+                    guard: "is_granted('ROLE_BUYER') and is_granted('ORG_MEMBER', subject.getOrganization())"
+                    from: [draft, pending_approval, published, closed]
+                    to: cancelled
+
+        proposal:
+            type: state_machine
+            audit_trail: { enabled: true }
+            marking_store: { type: method, property: status }
+            supports: [App\Entity\Proposal]
+            initial_marking: submitted
+            places: [submitted, shortlisted, rejected, accepted, withdrawn]
+            transitions:
+                shortlist:
+                    guard: "(is_granted('ROLE_BUYER') or is_granted('ROLE_REQUESTER')) and is_granted('ORG_MEMBER', subject.getTender().getOrganization())"
+                    from: submitted
+                    to: shortlisted
+                reject:
+                    guard: "(is_granted('ROLE_BUYER') or is_granted('ROLE_REQUESTER')) and is_granted('ORG_MEMBER', subject.getTender().getOrganization())"
+                    from: [submitted, shortlisted]
+                    to: rejected
+                accept:
+                    guard: "is_granted('ROLE_BUYER') and is_granted('ORG_MEMBER', subject.getTender().getOrganization())"
+                    from: shortlisted
+                    to: accepted
+                withdraw:
+                    guard: "is_granted('ROLE_SUPPLIER') and is_granted('ORG_MEMBER', subject.getSupplier())"
+                    from: [submitted, shortlisted]
+                    to: withdrawn
+
+        contract:
+            type: state_machine
+            audit_trail: { enabled: true }
+            marking_store: { type: method, property: status }
+            supports: [App\Entity\Contract]
+            initial_marking: pending_buyer_signature
+            places: [pending_buyer_signature, pending_supplier_signature, active, completed, terminated]
+            transitions:
+                sign_buyer:
+                    guard: "is_granted('ROLE_BUYER') and is_granted('ORG_MEMBER', subject.getBuyer())"
+                    from: pending_buyer_signature
+                    to: pending_supplier_signature
+                sign_supplier:
+                    guard: "is_granted('ROLE_SUPPLIER') and is_granted('ORG_MEMBER', subject.getSupplier())"
+                    from: pending_supplier_signature
+                    to: active
+                complete:
+                    guard: "is_granted('ROLE_BUYER') and is_granted('ORG_MEMBER', subject.getBuyer())"
+                    from: active
+                    to: completed
+                terminate:
+                    guard: "is_granted('ROLE_BUYER') and is_granted('ORG_MEMBER', subject.getBuyer())"
+                    from: [pending_buyer_signature, pending_supplier_signature, active]
+                    to: terminated
+
+        invoice:
+            type: state_machine
+            audit_trail: { enabled: true }
+            marking_store: { type: method, property: status }
+            supports: [App\Entity\Invoice]
+            initial_marking: draft
+            places: [draft, submitted, approved, rejected, paid]
+            transitions:
+                submit:
+                    guard: "is_granted('ROLE_SUPPLIER') and is_granted('ORG_MEMBER', subject.getSupplier())"
+                    from: [draft, rejected]
+                    to: submitted
+                approve:
+                    guard: "is_granted('ROLE_BUYER') and is_granted('ORG_MEMBER', subject.getBuyer())"
+                    from: submitted
+                    to: approved
+                reject:
+                    guard: "is_granted('ROLE_BUYER') and is_granted('ORG_MEMBER', subject.getBuyer())"
+                    from: submitted
+                    to: rejected
+                pay:
+                    guard: "is_granted('ROLE_BUYER') and is_granted('ORG_MEMBER', subject.getBuyer())"
+                    from: approved
+                    to: paid

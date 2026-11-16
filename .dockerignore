@@ -1,0 +1,15 @@
+**/node_modules
+**/vendor
+**/var
+frontend/dist
+frontend/.angular
+backend/config/jwt/*.pem
+backend/.env.local
+backend/.env.*.local
+backend/php.ini
+backend/tests
+.env.docker
+**/*.sqlite
+**/*.db
+.git
+.cache

@@ -1,0 +1,68 @@
+stages: [quality, test, build]
+
+variables:
+  COMPOSER_CACHE_DIR: "$CI_PROJECT_DIR/.cache/composer"
+  npm_config_cache: "$CI_PROJECT_DIR/.cache/npm"
+
+.backend:
+  image: php:8.3-cli-alpine
+  before_script:
+    - apk add --no-cache git unzip icu-dev libzip-dev sqlite-dev $PHPIZE_DEPS > /dev/null
+    - docker-php-ext-install intl zip pdo_sqlite > /dev/null
+    - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer > /dev/null
+    - cd backend && composer install --no-interaction --no-progress --prefer-dist
+  cache:
+    key: composer-$CI_COMMIT_REF_SLUG
+    paths: [.cache/composer]
+
+phpstan:
+  extends: .backend
+  stage: quality
+  script:
+    - php bin/console cache:warmup --env=dev > /dev/null
+    - vendor/bin/phpstan analyse --no-progress --memory-limit=1G
+
+composer-audit:
+  extends: .backend
+  stage: quality
+  script:
+    - composer audit
+  allow_failure: true
+
+phpunit:
+  extends: .backend
+  stage: test
+  script:
+    - php bin/console lexik:jwt:generate-keypair --skip-if-exists
+    - php bin/phpunit --log-junit ../phpunit-report.xml
+  artifacts:
+    when: always
+    reports:
+      junit: phpunit-report.xml
+
+frontend:
+  image: node:22-alpine
+  stage: test
+  cache:
+    key: npm-$CI_COMMIT_REF_SLUG
+    paths: [.cache/npm]
+  script:
+    - cd frontend
+    - npm ci --no-audit --no-fund
+    - npx ng build --configuration production
+  artifacts:
+    paths: [frontend/dist/]
+    expire_in: 1 week
+
+docker-images:
+  image: docker:27
+  services: [docker:27-dind]
+  stage: build
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+    - docker build -f docker/php/Dockerfile --target prod -t "$CI_REGISTRY_IMAGE/api:$CI_COMMIT_SHORT_SHA" -t "$CI_REGISTRY_IMAGE/api:latest" .
+    - docker build -f docker/nginx/Dockerfile -t "$CI_REGISTRY_IMAGE/web:$CI_COMMIT_SHORT_SHA" -t "$CI_REGISTRY_IMAGE/web:latest" .
+    - docker push --all-tags "$CI_REGISTRY_IMAGE/api"
+    - docker push --all-tags "$CI_REGISTRY_IMAGE/web"

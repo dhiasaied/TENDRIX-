@@ -1,0 +1,34 @@
+framework:
+    secret: '%env(APP_SECRET)%'
+    session: false
+    trusted_proxies: '%env(default::TRUSTED_PROXIES)%'
+    trusted_headers: ['x-forwarded-for', 'x-forwarded-proto', 'x-forwarded-port', 'x-forwarded-host']
+
+    rate_limiter:
+        # Each AI call may hit the LLM: cap usage per user.
+        ai_agents:
+            policy: sliding_window
+            limit: 30
+            interval: '10 minutes'
+        # Self-service sign-up, per client IP: stops account-creation spam and e-mail enumeration.
+        registration:
+            policy: fixed_window
+            limit: 5
+            interval: '1 hour'
+
+when@test:
+    framework:
+        test: true
+        validation:
+            not_compromised_password: false
+        cache:
+            # Rate-limiter state lives in memory so tests never leak quotas into each other...
+            app: cache.adapter.array
+            pools:
+                # ...except the sign-up limiter, which must survive the test client's service reset
+                # between requests; ApiTestCase clears it before every test.
+                cache.test_registration_limiter:
+                    adapter: cache.adapter.filesystem
+        rate_limiter:
+            registration:
+                cache_pool: cache.test_registration_limiter

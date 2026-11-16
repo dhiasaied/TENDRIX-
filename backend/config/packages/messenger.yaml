@@ -1,0 +1,26 @@
+framework:
+    messenger:
+        failure_transport: failed
+
+        transports:
+            # Domain events are processed by `messenger:consume async` workers (see compose.yaml).
+            async:
+                dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
+                options:
+                    queue_name: async
+                retry_strategy:
+                    max_retries: 3
+                    delay: 2000
+                    multiplier: 3
+            failed: 'doctrine://default?queue_name=failed'
+
+        routing:
+            App\Message\WorkflowTransitioned: async
+            App\Message\ProposalSubmitted: async
+            App\Message\EvaluationSubmitted: async
+
+when@test:
+    framework:
+        messenger:
+            transports:
+                async: 'sync://'
